@@ -13,7 +13,7 @@ export class AudioCrosstalkControl {
   }
 
   static default() {
-    return new AudioCrosstalkControl(false, NaN, 5, NaN, 250, 5000);
+    return new AudioCrosstalkControl(false, NaN, 5, NaN, 20, 20000);
   }
 
   isDefault() {
