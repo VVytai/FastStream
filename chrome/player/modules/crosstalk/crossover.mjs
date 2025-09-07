@@ -118,6 +118,109 @@ export class LinkwitzRileyCrossoverNetwork {
 
     this._sectionNodes = [];
   }
+  getFrequencyResponse(outputId, frequencyHz) {
+    if (!this._sectionNodes || this._sectionNodes.length === 0) {
+      throw new Error('network is not configured. Call configure first');
+    }
+
+    // Build the set of contributing paths for this output id.
+    const pathSpecs = [];
+
+    // Low bands: section i contributes if mappings[i] === outputId
+    for (let i = 0; i < this._sectionNodes.length; i++) {
+      if (this.mappings[i] === outputId) {
+        const nodes = [];
+        // All previous sections' HP are in series before the LP of this section
+        for (let j = 0; j < i; j++) nodes.push(this._sectionNodes[j].hp);
+        nodes.push(this._sectionNodes[i].lp);
+        for (const ap of this._sectionNodes[i].allpass) nodes.push(ap);
+        pathSpecs.push(nodes);
+      }
+    }
+
+    // Final high band
+    const highMapIndex = this._sectionNodes.length;
+    if (this.mappings[highMapIndex] === outputId) {
+      const nodes = [];
+      for (let j = 0; j < this._sectionNodes.length; j++) nodes.push(this._sectionNodes[j].hp);
+      pathSpecs.push(nodes);
+    }
+
+    if (pathSpecs.length === 0) {
+      throw new Error(`unknown output id: ${outputId}`);
+    }
+
+    let freqs;
+    if (frequencyHz instanceof Float32Array) {
+      freqs = frequencyHz;
+    } else if (Array.isArray(frequencyHz)) {
+      freqs = Float32Array.from(frequencyHz);
+    } else {
+      freqs = this._defaultFrequencyGrid();
+    }
+
+    const N = freqs.length;
+
+    // Complex accumulator for the output node: sum of parallel paths
+    const sumRe = new Float32Array(N);
+    const sumIm = new Float32Array(N);
+
+    const tmpMag = new Float32Array(N);
+    const tmpPhase = new Float32Array(N);
+
+    // Helper to cascade a sequence of nodes and add its complex response to the sums
+    const addPathToSum = (nodes) => {
+      // Accumulate series cascade for this path in polar form
+      const pathMag = new Float32Array(N);
+      const pathPhase = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        pathMag[i] = 1; pathPhase[i] = 0;
+      }
+
+      for (const node of nodes) {
+        node.getFrequencyResponse(freqs, tmpMag, tmpPhase);
+        for (let i = 0; i < N; i++) {
+          pathMag[i] *= tmpMag[i];
+          pathPhase[i] += tmpPhase[i];
+        }
+      }
+
+      // Convert to complex and add to output sums
+      for (let i = 0; i < N; i++) {
+        const re = pathMag[i] * Math.cos(pathPhase[i]);
+        const im = pathMag[i] * Math.sin(pathPhase[i]);
+        sumRe[i] += re;
+        sumIm[i] += im;
+      }
+    };
+
+    // Process all contributing paths
+    for (const nodes of pathSpecs) addPathToSum(nodes);
+
+    // Convert sums back to magnitude and phase
+    const magnitude = new Float32Array(N);
+    const phase = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const re = sumRe[i];
+      const im = sumIm[i];
+      magnitude[i] = Math.hypot(re, im);
+      phase[i] = Math.atan2(im, re);
+    }
+
+    return {frequencyHz: freqs, magnitude, phase};
+  }
+
+  _defaultFrequencyGrid(points = 512, fMin = 10) {
+    const nyquist = this.sampleRate * 0.5;
+    const start = Math.log10(Math.max(fMin, 1e-3));
+    const end = Math.log10(nyquist);
+    const freqs = new Float32Array(points);
+    for (let i = 0; i < points; i++) {
+      const t = i / (points - 1);
+      freqs[i] = Math.pow(10, start + t * (end - start));
+    }
+    return freqs;
+  }
 
   // 4th order Linkwitz Riley section coefficients
   _lr4Coeffs(fc, type) {
