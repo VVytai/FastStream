@@ -110,7 +110,7 @@ export class ConvolutionXTC {
       let H;
       if (sp < y || !valid) {
         H = this.calculateH(g, omegatc, B_P);
-      } else if (cm_I < cm_II) {
+      } else {
         H = [1, 0, 0, 0];
       }
 
