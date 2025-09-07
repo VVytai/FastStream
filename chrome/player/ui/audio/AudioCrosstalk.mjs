@@ -79,7 +79,7 @@ export class AudioCrosstalk extends AbstractAudioModule {
     return {
       microdelay: isNaN(this.crosstalkConfig.microdelay) ? predicted.microdelay : this.crosstalkConfig.microdelay,
       decay: AudioUtils.dbToGain(isNaN(this.crosstalkConfig.decay) ? predicted.decay : this.crosstalkConfig.decay),
-      colorgain: AudioUtils.dbToGain(this.crosstalkConfig.colorgain),
+      colorgain: this.crosstalkConfig.colorgain === 20 ? Infinity : AudioUtils.dbToGain(this.crosstalkConfig.colorgain),
       highbypass: this.crosstalkConfig.highbypass,
       lowbypass: this.crosstalkConfig.lowbypass,
     };

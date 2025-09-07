@@ -98,7 +98,7 @@ export class ConvolutionXTC {
     const max_y = 1.0 / (1.0 - g);
     const min_y = Math.max(1.0, Math.sqrt(5 + Math.sqrt(5)) / 2 / Math.sqrt(gg + 1));
     y = Math.max(min_y, y);
-    const valid = y <= max_y;
+    const valid = isFinite(y) && y <= max_y;
 
     for (let k = 0; k < n; k++) {
       const omegatc = 2 * Math.PI * k / n * tc;
@@ -111,11 +111,7 @@ export class ConvolutionXTC {
       if (sp < y || !valid) {
         H = this.calculateH(g, omegatc, B_P);
       } else if (cm_I < cm_II) {
-        const B_I = -gg + 2*g*cos + cm_I / y - 1;
-        H = this.calculateH(g, omegatc, B_I);
-      } else {
-        const B_II = -gg - 2*g*cos + cm_II / y - 1;
-        H = this.calculateH(g, omegatc, B_II);
+        H = [1, 0, 0, 0];
       }
 
       H_CIS[k * 2] = H[0];
